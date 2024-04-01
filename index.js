@@ -1,52 +1,41 @@
-// var Client = require('electron-ssh2').Client;
-// var conn = new Client();
-// conn.on('ready', function() {
-//   console.log('Client :: ready');
-//   conn.shell(function(err, stream) {
-//     if (err) throw err;
-//     stream.on('close', function() {
-//       console.log('Stream :: close');
-//       conn.end();
-//     }).on('data', function(data) {
-//       console.log('OUTPUT: ' + data);
-//     });
-//     stream.end('ls -l\nexit\n');
-//   });
-// }).connect({
-//   host: '192.168.100.100',
-//   port: 22,
-//   username: 'frylock'
-// });
-
-
-const { readFileSync } = require('fs');
-
-const { Client } = require('ssh2');
-
-const conn = new Client();
-conn.on('ready', () => {
-  console.log('Client :: ready');
-  conn.exec('uptime', (err, stream) => {
-    if (err) throw err;
-    stream.on('close', (code, signal) => {
-      console.log('Stream :: close :: code: ' + code + ', signal: ' + signal);
-      conn.end();
-    }).on('data', (data) => {
-      console.log('STDOUT: ' + data);
-    }).stderr.on('data', (data) => {
-      console.log('STDERR: ' + data);
+window.initSSH = (ip) => {
+  console.log('initSSH ', ip);
+  let Client = require('electron-ssh2').Client;
+  sshConn = new Client();
+  sshConn.on('ready', function () {
+    sshConn.shell(function (err, stream) {
+      sshStream = stream;
+      console.log('err', err);
+      if (err) throw err;
+      stream.on('close', function () {
+        sshConn.end();
+      }).on('data', function (data) {
+        console.log('OUTPUT: ' + data);
+      });
     });
+  }).connect({
+    host: ip,
+    port: 22,
+    username: 'root',
+    password: 'secret'
   });
-}).connect({
-  host: '192.168.100.100',
-  port: 22,
-  username: 'frylock',
-  privateKey: readFileSync('/path/to/my/key')
-});
-
-// example output:
-// Client :: ready
-// STDOUT:  17:41:15 up 22 days, 18:09,  1 user,  load average: 0.00, 0.01, 0.05
-//
-// Stream :: exit :: code: 0, signal: undefined
-// Stream :: close
+};
+window.sshExec = (args, func) => {
+  if (sshConn && sshStream) {
+    if (args.command === 'exit\n') {
+      console.log('Exit');
+      try {
+        sshStream.end(args.command);
+      } catch (e) {
+        console.log('Exit', e);
+      }
+    } else {
+      sshStream.on('data', function (data) {
+        if (func) {
+          func(data.toString());
+        }
+      });
+      sshStream.write(args.command);
+    }
+  }
+};
